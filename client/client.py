@@ -1,6 +1,5 @@
 """
 web_server.py
-Author: Tytus Woodburn
 CS 341 Computer Networks
 Lab 4
 
