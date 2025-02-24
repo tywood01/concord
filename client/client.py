@@ -25,10 +25,14 @@ SERVER_SOCKET.bind(("localhost", SERVER_PORT))
 SERVER_SOCKET.listen(1)
 
 
-def send_message(socket, message):
-    clientsocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    clientsocket.connect(("localhost", 10261))
-    clientsocket.send("hello")
+def send_message():
+    """listens for input and sends messages to server"""
+
+    while True:
+        message = str(input())
+        clientsocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        clientsocket.connect(("localhost", 10261))
+        clientsocket.send(message.encode)
 
 
 def recieve_messages():
@@ -49,7 +53,13 @@ def recieve_messages():
 
 
 def main():
-    recieve_messages()
+    # Create a new thread to listen for messages
+    thread = threading.Thread(target=recieve_messages)
+    thread.start()
+
+    # Listen for input and send messages
+    thread2 = threading.Thread(target=send_message())
+    thread2.start()
 
 
 if __name__ == "__main__":
