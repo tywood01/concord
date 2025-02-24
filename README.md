@@ -6,9 +6,7 @@
 - Messages are stored and the user can view their history
 - Users can recieve messages at the same time
 - (Maybe alternative file formats.)
-
-
-
+- The user will have to see their sent messages.
 
 ## Overview
 This project is a real-time chat application that allows users to communicate instantly over a network. It supports multiple users connecting simultaneously and exchanging messages in real-time.
