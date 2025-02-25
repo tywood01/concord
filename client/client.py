@@ -1,65 +1,55 @@
 """
-web_server.py
+Client.py
 CS 341 Computer Networks
 Lab 4
-
+Description:
+This program listens and sends messages to the server
+via socket programming in Python.
 """
 
 # Available Ports: Tytus: 10261 through 10280
-from socket import socket, AF_INET, SOCK_STREAM
+import socket
 import threading
 
-# about what kind of connection you are making.
-# What are AF_INET and SOCK_STREAM?
-# AF_INET is an address family that can designate the type of
-# adresses your socket can communnicate with.
-# AF_INET: address format is host and port number
-# SOCK_STREAM is a connection-oriented TCP protocol stream.
-SERVER_SOCKET = socket(AF_INET, SOCK_STREAM)
-SERVER_PORT = 10261
 
-# Bind the socket to server address and server port
-SERVER_SOCKET.bind(("localhost", SERVER_PORT))
-
-# Listen to at most 1 connection at a time
-SERVER_SOCKET.listen(1)
+HOST = "localhost"
+PORT = 10263
 
 
 def send_message():
     """listens for input and sends messages to server"""
 
+    clientsocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    clientsocket.connect((HOST, PORT))
+
     while True:
-        message = str(input())
-        clientsocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        clientsocket.connect(("localhost", 10261))
-        clientsocket.send(message.encode)
+        message = input()
+        print(message)
+        clientsocket.sendall(message.encode())
+        print("sent info")
+
+    clientsocket.close()
 
 
-def recieve_messages():
+def recieve_message():
+    """listens for messages from server"""
+
     while True:
-        print("Ready to serve...")
-        # Set up a new connection from the client
-        connection_socket, addr = SERVER_SOCKET.accept()
-        print("Got connection from", addr)
-
-        # Receive and decode the request message from the client
-        data = connection_socket.recv(1024)
-        str_data = data.decode()
-        print("from client: ", str_data)
-        connection_socket.close()
-
-    # Close the server socket
-    SERVER_SOCKET.close()
+        client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        client_socket.connect((HOST, PORT))
+        message = client_socket.recv(1024)
+        print("from server: ", message.decode())
+        client_socket.close()
 
 
 def main():
-    # Create a new thread to listen for messages
-    thread = threading.Thread(target=recieve_messages)
-    thread.start()
+    # Initialize send and recieving threads.
+    recieve_thread = threading.Thread(target=recieve_message())
+    send_thread = threading.Thread(target=send_message())
 
-    # Listen for input and send messages
-    thread2 = threading.Thread(target=send_message())
-    thread2.start()
+    print("Starting Threads")
+    recieve_thread.start()
+    send_thread.start()
 
 
 if __name__ == "__main__":

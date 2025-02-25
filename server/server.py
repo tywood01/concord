@@ -6,13 +6,11 @@ Lab 4
 """
 
 # Available Ports: Tytus: 10261 through 10280
-from socket import socket, AF_INET, SOCK_STREAM
 import socket
-
 import threading
 
-
-users = {1: "Tytus", 2: "John", 3: "Jane"}
+HOST = "localhost"
+PORT = 10263
 
 
 def send_message(message):
@@ -32,12 +30,37 @@ def send_message(message):
         client_socket.close()
 
 
-def recieve_messages():
-    pass
+def recieve_messages(server_socket):
+    conn, addr = server_socket.accept()
+    print("Got connection from", addr)
+
+    with conn:
+        print("inside connection")
+        while True:
+            print("inside while")
+            # Receive and decode the request message from the client
+            data = conn.recv(1024)
+            print("recieved data")
+            if not data:
+                print("Client disconnected")
+
+                break
+            print("from client: ", data.decode())
+
+    conn.close()
 
 
 def main():
-    send_message("hello")
+    print("in main")
+    server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    server_socket.bind((HOST, PORT))
+    server_socket.listen(1)
+
+    # Pass target function and its arguments as a tuple
+    recieve_thread = threading.Thread(target=recieve_messages, args=(server_socket,))
+
+    print("Starting Thread")
+    recieve_thread.start()
 
 
 if __name__ == "__main__":
