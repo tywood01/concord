@@ -18,34 +18,43 @@ PORT = 10263
 
 def send_message():
     """listens for input and sends messages to server"""
+    client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    client_socket.connect((HOST, PORT))
 
-    clientsocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    clientsocket.connect((HOST, PORT))
+    try:
+        while True:
+            message = input("Enter message: ")
+            print(f"Sending: {message}")
+            client_socket.sendall(message.encode())
 
-    while True:
-        message = input()
-        print(message)
-        clientsocket.sendall(message.encode())
-        print("sent info")
+    except KeyboardInterrupt:
+        print("Closing client")
 
-    clientsocket.close()
+    finally:
+        client_socket.close()
 
 
 def recieve_message():
     """listens for messages from server"""
+    client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    client_socket.connect((HOST, PORT))
 
-    while True:
-        client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        client_socket.connect((HOST, PORT))
-        message = client_socket.recv(1024)
-        print("from server: ", message.decode())
+    try:
+        while True:
+            message = client_socket.recv(1024)
+            print("from server: ", message.decode())
+
+    except KeyboardInterrupt:
+        print("Closing client")
+
+    finally:
         client_socket.close()
 
 
 def main():
     # Initialize send and recieving threads.
-    recieve_thread = threading.Thread(target=recieve_message())
-    send_thread = threading.Thread(target=send_message())
+    recieve_thread = threading.Thread(target=recieve_message)
+    send_thread = threading.Thread(target=send_message)
 
     print("Starting Threads")
     recieve_thread.start()
