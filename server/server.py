@@ -8,9 +8,17 @@ Lab 4
 # Available Ports: Tytus: 10261 through 10280
 import socket
 import threading
+import sqlite3
 
 HOST = "localhost"
 PORT = 10263
+DATABASE = "concord.db"
+
+
+def connect_db(path):
+    conn = sqlite3.connect(path)
+    cursor = conn.cursor()
+    return cursor
 
 
 def handler(conn, addr):
@@ -26,6 +34,8 @@ def handler(conn, addr):
 
 
 def main():
+    cursor = connect_db(DATABASE)
+
     server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server_socket.bind((HOST, PORT))
     server_socket.listen(1)

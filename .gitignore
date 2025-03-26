@@ -2,7 +2,7 @@ __pycache__/
 *.py[oc]
 
 # Virtual Environment
-venv
+.venv
 
 # Local Database
 *.sqlite3
