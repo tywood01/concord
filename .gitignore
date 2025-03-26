@@ -1,0 +1,9 @@
+__pycache__/
+*.py[oc]
+
+# Virtual Environment
+venv
+
+# Local Database
+*.sqlite3
+concord.db
