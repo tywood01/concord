@@ -33,7 +33,7 @@ def main():
 
     while True:
         conn, addr = server_socket.accept()
-        conn.send(b"Hello from server")
+        conn.send(b"Welcome to Concord!")
         thread = threading.Thread(target=handler, args=(conn, addr))
         thread.start()
 
