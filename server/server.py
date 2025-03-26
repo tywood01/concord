@@ -15,10 +15,21 @@ PORT = 10263
 DATABASE = "concord.db"
 
 
-def connect_db(path):
-    conn = sqlite3.connect(path)
+
+def update_user_tables():
+    conn = sqlite3.connect(DATABASE)
     cursor = conn.cursor()
-    return cursor
+    # Updates tables with user ids, username, last login date, and current online status
+    cursor.execute("INSERT INTO users (user_id, last_logged_on) VALUES (1, '2025-03-25 10:30:00')")   
+    # Commit the changes and close the connection
+
+    cursor.execute("SELECT * FROM users")
+    conn.commit()
+    conn.close()
+
+print("Table 'users' has been created successfully in 'database.py'.")
+
+
 
 
 def handler(conn, addr):
@@ -34,7 +45,10 @@ def handler(conn, addr):
 
 
 def main():
-    cursor = connect_db(DATABASE)
+    conn = sqlite3.connect(DATABASE)
+    cursor = conn.cursor()
+
+    create_tables(conn, cursor)
 
     server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server_socket.bind((HOST, PORT))
