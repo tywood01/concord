@@ -7,3 +7,6 @@ __pycache__/
 # Local Database
 *.sqlite3
 concord.db
+
+# Settings
+server/settings.py

@@ -1,19 +1,23 @@
 """
-Client.py
-CS 341 Computer Networks
-Lab 4
+client.py
+Authors: Tytus Woodburn
+
 Description:
-This program listens and sends messages to the server
-via socket programming in Python.
+    This program listens and sends messages to the server
+    via socket programming in Python.
 """
 
 # Available Ports: Tytus: 10261 through 10280
 import socket
 import threading
+import json
+import os
+import sys
 
+# Add the root directory to the system path
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-HOST = "localhost"
-PORT = 10263
+from settings import HOST, PORT
 
 
 def send_message():
@@ -22,10 +26,17 @@ def send_message():
     client_socket.connect((HOST, PORT))
 
     try:
+        username = input("Enter your username: ")
+
         while True:
+            reciever = input("Enter reciever: ")
             message = input("Enter message: ")
-            print(f"Sending: {message}")
-            client_socket.sendall(message.encode())
+
+            data = {"username": username, "message": message, "receiver": reciever}
+            json_data = json.dumps(data)
+
+            print(f"Sending: {data}")
+            client_socket.sendall(json_data.encode())
 
     except KeyboardInterrupt:
         print("Closing client")

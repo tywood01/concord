@@ -1,3 +1,12 @@
+"""
+database.py
+Authors: Tytus Woodburn
+
+Description:
+    This program creates the tables for the SQLite database
+    used by the server to store user information and messages.
+"""
+
 import sqlite3
 
 # Connect to SQLite database (or create it if it doesn't exist)
@@ -9,7 +18,7 @@ cursor.execute("""
 CREATE TABLE IF NOT EXISTS users (
     userid INTEGER PRIMARY KEY AUTOINCREMENT,
     username TEXT NOT NULL UNIQUE,
-    last_logged_in TEXT,
+    last_login DATETIME,
     online INTEGER DEFAULT 0
 )
 """)
