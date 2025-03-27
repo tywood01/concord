@@ -9,4 +9,4 @@ __pycache__/
 concord.db
 
 # Settings
-server/settings.py
+settings.py
