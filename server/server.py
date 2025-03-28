@@ -25,19 +25,26 @@ def store_user():
     cursor = conn.cursor()
     # Updates tables with user ids, username, last login date, and current online status
     cursor.execute(
-        "INSERT INTO users (user_id, last_logged_on) VALUES (1, '2025-03-25 10:30:00')"
+        """
+        INSERT INTO users (username, last_login, online) VALUES
+            ('client5', '2025-03-26 10:05:00', 1),
+            ('client6', '2025-03-26 10:05:00', 1)
+        """
     )
-    # Commit the changes and close the connection
-
-    cursor.execute("SELECT * FROM users")
     conn.commit()
-    conn.close()
 
+    # Commit the changes and close the connection
+    # Show all the messages in the messages table
+    cursor.execute("SELECT * FROM users")
+    rows = cursor.fetchall()
+    for row in rows:
+        print(row, flush=True)
 
-print("Table 'users' has been created successfully in 'database.py'.")
+    print("Table 'users' has been created successfully in 'database.py'.")
 
 
 def store_message(data):
+    print("inside stor message")
     conn = sqlite3.connect(DATABASE)
     cursor = conn.cursor()
 
@@ -46,6 +53,7 @@ def store_message(data):
         username = data.get("username")
         message_body = data.get("message_body")
         receiver = data.get("receiver")
+        timestamp = data.get("timestamp")
 
         print(f"Storing message: {data}", flush=True)
 
@@ -55,11 +63,11 @@ def store_message(data):
             INSERT INTO messages (message_body, message_date, sender, receiver)
             VALUES (?, ?, ?, ?)
             """,
-            (message_body, "2025-03-26 10:05:00", username, receiver),
+            (message_body, timestamp, username, receiver),
         )
 
         conn.commit()
-        print("User tables updated", flush=True)
+        print("User tables updated")
 
         cursor.execute("SELECT * FROM messages;")
         rows = cursor.fetchall()
@@ -70,19 +78,20 @@ def store_message(data):
         print(f"Error in store_message: {e}", flush=True)
 
     finally:
+        print("closing connection")
         conn.close()
 
 
-def handler(conn, addr):
+def handler(client_conn, addr):
     """Handles incoming connections and messages from clients"""
 
     print("Got connection from", addr)
-    with conn:
-        user = conn.recv(1024).decode()
+    with client_conn:
+        user = client_conn.recv(1024).decode()
         print(f"User {user} connected from {addr}")
 
         while True:
-            data = conn.recv(1024)
+            data = client_conn.recv(1024)
             if not data:
                 print(f"Client {addr} disconnected")
                 break
@@ -93,16 +102,21 @@ def handler(conn, addr):
                 sender = message.get("username")
                 message_body = message.get("message_body")
                 receiver = message.get("receiver")
+                timestamp = message.get("timestamp")
 
                 store_message(message)
+                # send_message(message)
 
-                print(f"User {sender} from {addr} says: {message_body} to {receiver}")
+                print(
+                    f"User {sender} from {addr} says: {message_body} to {receiver} at time {timestamp}"
+                )
 
                 # Send acknowledgment back to the client
-                conn.sendall(b"Message received")
+                client_conn.sendall(b"Message received")
 
             except json.JSONDecodeError:
                 print("Received invalid JSON data")
+                client_conn.sendall(b"Received invalid JSON data")
 
 
 def main():
@@ -110,11 +124,12 @@ def main():
     server_socket.bind((HOST, PORT))
     server_socket.listen(1)
     print(f"Server listening on {HOST}:{PORT}")
+    store_user()
 
     while True:
-        conn, addr = server_socket.accept()
-        conn.send(b"Welcome to Concord!")
-        thread = threading.Thread(target=handler, args=(conn, addr))
+        client_conn, addr = server_socket.accept()
+        client_conn.send(b"Welcome to Concord!")
+        thread = threading.Thread(target=handler, args=(client_conn, addr))
         thread.start()
 
 

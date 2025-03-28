@@ -28,7 +28,7 @@ cursor.execute("""
 CREATE TABLE IF NOT EXISTS messages (
     message_id INTEGER PRIMARY KEY AUTOINCREMENT,
     message_body TEXT NOT NULL,
-    message_date TEXT NOT NULL,
+    message_date DATETIME,
     sender INTEGER NOT NULL,
     receiver INTEGER NOT NULL,
     FOREIGN KEY (sender) REFERENCES users(userid),

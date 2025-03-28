@@ -13,6 +13,7 @@ import threading
 import json
 import os
 import sys
+import datetime
 
 # Add the root directory to the system path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -31,8 +32,16 @@ def send_message():
         while True:
             reciever = input("Enter reciever: ")
             message = input("Enter message: ")
+            timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            print(timestamp)
 
-            data = {"username": username, "message": message, "receiver": reciever}
+            data = {
+                "username": username,
+                "message": message,
+                "receiver": reciever,
+                "timestamp": timestamp,
+            }
+
             json_data = json.dumps(data)
 
             print(f"Sending: {data}")
