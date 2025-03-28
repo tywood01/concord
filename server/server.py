@@ -17,7 +17,7 @@ import sys
 # Add the root directory to the system path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from settings import HOST, PORT, DATABASE
+from ..settings import HOST, PORT, DATABASE
 
 
 def store_user():
