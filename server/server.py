@@ -71,7 +71,6 @@ class RealTimeServer:
                     try:
                         message = json.loads(data.decode())
                         # Deserialize JSON string into components
-                        sender = message.get("username")
                         message_body = message.get("message_body")
                         receiver = message.get("receiver")
                         timestamp = message.get("timestamp")
@@ -80,7 +79,7 @@ class RealTimeServer:
                         # send_message(message)
 
                         print(
-                            f"User {sender} from {addr} says: {message_body} to {receiver} at time {timestamp}"
+                            f"User {user} from {addr} says: {message_body} to {receiver} at time {timestamp}"
                         )
 
                         # Send acknowledgment back to the client

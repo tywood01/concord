@@ -39,7 +39,7 @@ class DatabaseApi(object):
         )
         conn.commit()
 
-    def get_user(self, username, conn, cursor):
+    def get_user(username, conn, cursor):
         """
         Gets the user from the users table.
         user found return user_id
