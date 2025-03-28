@@ -7,7 +7,6 @@ Description:
     via socket programming in Python.
 """
 
-# Available Ports: Tytus: 10261 through 10280
 import socket
 import threading
 import json
@@ -21,37 +20,63 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from settings import HOST, PORT
 
 
-def send_message():
-    """listens for input and sends messages to server"""
-    client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    client_socket.connect((HOST, PORT))
+class RealTimeClient:
+    def __init__(self):
+        self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.client_socket.connect((HOST, PORT))
+        self.username = None
 
-    try:
-        username = input("Enter your username: ")
+    def main(self):
+        self.login()
 
-        while True:
-            reciever = input("Enter reciever: ")
-            message = input("Enter message: ")
-            timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            print(timestamp)
+        # Initialize send and recieving threads.
+        recieve_thread = threading.Thread(target=self.recieve_message)
+        send_thread = threading.Thread(target=self.send_thread)
 
-            data = {
-                "username": username,
-                "message": message,
-                "receiver": reciever,
-                "timestamp": timestamp,
-            }
+        print("Starting Threads")
+        recieve_thread.start()
+        send_thread.start()
 
-            json_data = json.dumps(data)
+    def login(self):
+        """Logs in the user to the server"""
 
-            print(f"Sending: {data}")
-            client_socket.sendall(json_data.encode())
+        while not self.username:
+            self.username = input("Enter your username: ")
+            self.client_socket.sendall(self.username.encode())
 
-    except KeyboardInterrupt:
-        print("Closing client")
+            ack = self.client_socket.recv(1024)
+            if ack.decode() != "ACK":
+                print(ack.decode())
+                self.username = None
 
-    finally:
-        client_socket.close()
+        print(f"Logged in as {self.username}")
+
+    def send_thread(self):
+        """listens for input and sends messages to server"""
+
+        try:
+            while True:
+                reciever = input("Enter reciever: ")
+                message = input("Enter message: ")
+                timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+                data = {
+                    "username": self.username,
+                    "receiver": reciever,
+                    "message": message,
+                    "timestamp": timestamp,
+                }
+
+                json_data = json.dumps(data)
+
+                print(f"Sending: {data}")
+                self.client_socket.sendall(json_data.encode())
+                ack = self.client_socket.recv(1024)
+                print(ack.decode())
+
+        except KeyboardInterrupt:
+            print("Closing client")
+            self.client_socket.close()
 
 
 def recieve_message():
@@ -72,13 +97,7 @@ def recieve_message():
 
 
 def main():
-    # Initialize send and recieving threads.
-    recieve_thread = threading.Thread(target=recieve_message)
-    send_thread = threading.Thread(target=send_message)
-
-    print("Starting Threads")
-    recieve_thread.start()
-    send_thread.start()
+    RealTimeClient.main()
 
 
 if __name__ == "__main__":

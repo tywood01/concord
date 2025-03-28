@@ -9,10 +9,11 @@ Description:
 
 import socket
 import threading
-import sqlite3
 import json
 import os
 import sys
+import db_api
+import datetime
 
 # Add the root directory to the system path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -20,7 +21,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from settings import HOST, PORT, DATABASE
 
 
-def store_user():
+def store_user(data):
     conn = sqlite3.connect(DATABASE)
     cursor = conn.cursor()
     # Updates tables with user ids, username, last login date, and current online status
@@ -82,13 +83,30 @@ def store_message(data):
         conn.close()
 
 
-def handler(client_conn, addr):
+def handler(client_conn, addr, DB):
     """Handles incoming connections and messages from clients"""
 
     print("Got connection from", addr)
     with client_conn:
-        user = client_conn.recv(1024).decode()
-        print(f"User {user} connected from {addr}")
+        # Client "Login" or "Register" process
+        user = None
+        while not user:
+            user = client_conn.recv(1024).decode()
+            if DB.get_user(user) is None:
+                client_conn.sendall(
+                    b"User does not exist would you like to add it?(y/n)"
+                )
+                response = client_conn.recv(1024).decode()
+
+                if response == "y":
+                    DB.insert_user(user, datetime.datetime.now(), 1)
+                    user = DB.get_user(user)
+                    print(f"User {user} connected from {addr}")
+
+                else:
+                    user = None
+
+            print(f"User {user} connected from {addr}")
 
         while True:
             data = client_conn.recv(1024)
@@ -120,6 +138,8 @@ def handler(client_conn, addr):
 
 
 def main():
+    DB = db_api.DatabaseApi()
+
     server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     server_socket.bind((HOST, PORT))
     server_socket.listen(1)
@@ -129,7 +149,7 @@ def main():
     while True:
         client_conn, addr = server_socket.accept()
         client_conn.send(b"Welcome to Concord!")
-        thread = threading.Thread(target=handler, args=(client_conn, addr))
+        thread = threading.Thread(target=handler, args=(client_conn, addr, DB))
         thread.start()
 
 
