@@ -3,10 +3,10 @@ web_server.py
 Authors: Tytus Woodburn
 
 Description:
-
+    This program creates a web server that listens for incoming
+    TCP socket connections and messages passed between clients.
 """
 
-# Available Ports: Tytus: 10261 through 10280
 import socket
 import threading
 import sqlite3
@@ -18,6 +18,23 @@ import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from settings import HOST, PORT, DATABASE
+
+
+def store_user():
+    conn = sqlite3.connect(DATABASE)
+    cursor = conn.cursor()
+    # Updates tables with user ids, username, last login date, and current online status
+    cursor.execute(
+        "INSERT INTO users (user_id, last_logged_on) VALUES (1, '2025-03-25 10:30:00')"
+    )
+    # Commit the changes and close the connection
+
+    cursor.execute("SELECT * FROM users")
+    conn.commit()
+    conn.close()
+
+
+print("Table 'users' has been created successfully in 'database.py'.")
 
 
 def store_message(data):
