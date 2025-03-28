@@ -29,8 +29,10 @@ class RealTimeClient:
     def main(self):
         self.login()
 
-        # Initialize send and recieving threads.
-        recieve_thread = threading.Thread(target=self.recieve_message)
+        print("Login Success!!!")
+
+        # Initialize sending and recieving threads.
+        recieve_thread = threading.Thread(target=self.recieve_thread)
         send_thread = threading.Thread(target=self.send_thread)
 
         print("Starting Threads")
@@ -78,26 +80,24 @@ class RealTimeClient:
             print("Closing client")
             self.client_socket.close()
 
+    def recieve_thread(self):
+        """listens for messages from server"""
+        client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        client_socket.connect((HOST, PORT))
 
-def recieve_message():
-    """listens for messages from server"""
-    client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    client_socket.connect((HOST, PORT))
+        try:
+            while True:
+                message = client_socket.recv(1024)
+                print("from server: ", message.decode())
 
-    try:
-        while True:
-            message = client_socket.recv(1024)
-            print("from server: ", message.decode())
-
-    except KeyboardInterrupt:
-        print("Closing client")
-
-    finally:
-        client_socket.close()
+        except KeyboardInterrupt:
+            print("Closing client")
+            client_socket.close()
 
 
 def main():
-    RealTimeClient.main()
+    client = RealTimeClient()
+    client.main()
 
 
 if __name__ == "__main__":

@@ -21,53 +21,51 @@ class DatabaseApi(object):
     """This class is used to interact with the database."""
 
     def __init__(self):
-        """Initializes the database connection."""
-        self.conn = sqlite3.connect(DATABASE)
+        self.db_path = DATABASE
+
+    def get_connection(self):
+        self.conn = sqlite3.connect(self.db_path)
         self.cursor = self.conn.cursor()
+        return (self.conn, self.cursor)
 
-    def __del__(self):
-        """Closes the database connection."""
-        if self.conn:
-            self.conn.close()
-
-    def insert_user(self, username, last_login, online):
+    def insert_user(username, last_login, online, conn, cursor):
         """Inserts a user into the users table."""
-        self.cursor.execute(
+        cursor.execute(
             """
             INSERT INTO users (username, last_login, online) VALUES
                 (?, ?, ?)
             """,
             (username, last_login, online),
         )
-        self.conn.commit()
+        conn.commit()
 
-    def get_user(self, username):
+    def get_user(self, username, conn, cursor):
         """
         Gets the user from the users table.
         user found return user_id
         no user found return None
         """
 
-        self.cursor.execute(
+        cursor.execute(
             """
             SELECT userid FROM users WHERE username = ?
             """,
             (username,),
         )
-        user_id = self.cursor.fetchone()
+        user_id = cursor.fetchone()
 
         if user_id is None:
             return None
 
         return user_id[0]
 
-    def insert_message(self, message_body, message_date, sender, receiver):
+    def insert_message(message_body, message_date, sender, receiver, conn, cursor):
         """Inserts a message into the messages table."""
-        self.cursor.execute(
+        cursor.execute(
             """
             INSERT INTO messages (message_body, message_date, sender, receiver)
             VALUES (?, ?, ?, ?)
             """,
             (message_body, message_date, sender, receiver),
         )
-        self.conn.commit()
+        conn.commit()
