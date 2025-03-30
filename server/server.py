@@ -53,8 +53,14 @@ class RealTimeServer:
                     user = client_conn.recv(1024).decode()
 
                     if self.DB.get_user(user, db_conn, cursor) is None:
-                        client_conn.sendall(b"User does not exist")
-                        user = None
+                        client_conn.sendall(b"User does not exist would you like to create it? (y/n)")
+                        response = client_conn.recv(1024).decode()
+                        if response == "y":
+                            self.DB.insert_user(user, datetime.datetime.now(), 1, db_conn, cursor)
+                        else:
+                            user = None
+                    
+
 
                 client_conn.sendall(b"ACK")
                 print(f"User {user} connected from {addr}")
@@ -69,17 +75,24 @@ class RealTimeServer:
                         break
 
                     try:
-                        message = json.loads(data.decode())
+                        data = json.loads(data.decode())
                         # Deserialize JSON string into components
-                        message_body = message.get("message_body")
-                        receiver = message.get("receiver")
-                        timestamp = message.get("timestamp")
+                        message = data.get("message")
+                        receiver = data.get("receiver")
+                        timestamp = data.get("timestamp")
 
                         # store_message(message)
                         # send_message(message)
+                        if self.DB.get_user(receiver, db_conn, cursor):
+                            self.DB.insert_message(
+                                message, timestamp, user, receiver, db_conn, cursor
+                            )
+                        
+                        else:
+                            print(f"User {receiver} does not exist")
 
                         print(
-                            f"User {user} from {addr} says: {message_body} to {receiver} at time {timestamp}"
+                            f"User {user} from {addr} says: {message} to {receiver} at time {timestamp}"
                         )
 
                         # Send acknowledgment back to the client
