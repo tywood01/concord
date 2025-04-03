@@ -28,7 +28,7 @@ class DatabaseApi(object):
         self.cursor = self.conn.cursor()
         return (self.conn, self.cursor)
 
-    def insert_user(username, last_login, online, conn, cursor):
+    def insert_user(self, username, last_login, online, conn, cursor):
         """Inserts a user into the users table."""
         cursor.execute(
             """
@@ -39,7 +39,7 @@ class DatabaseApi(object):
         )
         conn.commit()
 
-    def get_user(username, conn, cursor):
+    def get_user(self, username, conn, cursor):
         """
         Gets the user from the users table.
         user found return user_id
@@ -59,7 +59,7 @@ class DatabaseApi(object):
 
         return user_id[0]
 
-    def insert_message(message_body, message_date, sender, receiver, conn, cursor):
+    def insert_message(self, message_body, message_date, sender, receiver, conn, cursor):
         """Inserts a message into the messages table."""
         cursor.execute(
             """
