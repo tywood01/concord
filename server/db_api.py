@@ -28,14 +28,14 @@ class DatabaseApi(object):
         self.cursor = self.conn.cursor()
         return (self.conn, self.cursor)
 
-    def insert_user(self, username, last_login, online, conn, cursor):
+    def insert_user(self, username, conn, cursor):
         """Inserts a user into the users table."""
         cursor.execute(
             """
-            INSERT INTO users (username, last_login, online) VALUES
-                (?, ?, ?)
+            INSERT INTO users (username) VALUES
+                (?)
             """,
-            (username, last_login, online),
+            (username,),
         )
         conn.commit()
 
@@ -59,13 +59,76 @@ class DatabaseApi(object):
 
         return user_id[0]
 
-    def insert_message(self, message_body, message_date, sender, receiver, conn, cursor):
+    def insert_message(self, message_body, message_date, sender, receiver, receiver_read, conn, cursor):
         """Inserts a message into the messages table."""
         cursor.execute(
             """
-            INSERT INTO messages (message_body, message_date, sender, receiver)
-            VALUES (?, ?, ?, ?)
+            INSERT INTO messages (message_body, message_date, sender, receiver, receiver_read)
+            VALUES (?, ?, ?, ?, ?)
             """,
-            (message_body, message_date, sender, receiver),
+            (message_body, message_date, sender, receiver, receiver_read),
         )
         conn.commit()
+
+    def read_messages(self, receiver, conn, cursor):
+        """Inserts a message into the messages table."""
+        cursor.execute(
+            """
+            UPDATE messages
+            SET receiver_read = 1
+            WHERE receiver = ?
+            """,
+            (receiver,),
+        )
+        conn.commit()
+
+
+
+    def insert_session(self, user, conn, cursor):
+        """ Inserts a session into the session table.
+            If session record exists, user is online.
+            If session record does not exist, user is offline.        
+        """
+        cursor.execute(
+            """
+            INSERT INTO sessions (user)
+            VALUES (?)
+            """,
+            (user,),
+        )
+        conn.commit()
+
+
+    def delete_session(self, user, conn, cursor):
+        """ Deletes a session from the session table.
+            The user is logging out.    
+        """
+        cursor.execute(
+            """
+            DELETE FROM sessions WHERE user = ?;
+            """,
+            (user,),
+        )
+        conn.commit()
+
+
+    def get_user_online_status(self, user, conn, cursor):
+        """
+        Gets the session from the sessions table.
+        If there is no session record, then returns False. (user is not online)
+        If there is a session record, then returns True. (user is online)
+        """
+
+        cursor.execute(
+            """
+            SELECT user FROM sessions WHERE user = ?
+            """,
+            (user,),
+        )
+        user_id = cursor.fetchone()
+
+        if user_id is None:
+            return False
+        else:
+            return True
+        

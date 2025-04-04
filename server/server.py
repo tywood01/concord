@@ -56,7 +56,7 @@ class RealTimeServer:
                         client_conn.sendall(b"User does not exist would you like to create it? (y/n)")
                         response = client_conn.recv(1024).decode()
                         if response == "y":
-                            self.DB.insert_user(user, datetime.datetime.now(), 1, db_conn, cursor)
+                            self.DB.insert_user(user, db_conn, cursor)
                         else:
                             user = None
                     
@@ -65,12 +65,24 @@ class RealTimeServer:
                 client_conn.sendall(b"ACK")
                 print(f"User {user} connected from {addr}")
 
-                # Retrieve messages for user
+
+                # User is online, insert a user session record
+                self.DB.insert_session(user, db_conn, cursor)
+
+                # TODO (We probably don't have to do this, this is harder) Retrieve all recived read messages for user & all sent messages (both sorted by date intertwined) 
+                # TODO (We should do this) Retrieve all unread messages for user (sorted by date)
+
+                # Marks all unread messages as read for receiver
+                self.DB.read_messages(user, db_conn, cursor)                
+
+
 
                 # Message handling loop
                 while True:
                     data = client_conn.recv(1024)
                     if not data:
+                        # Client disconnected & remove user session record
+                        self.DB.delete_session(user, db_conn, cursor)
                         print(f"Client {addr} disconnected")
                         break
 
@@ -81,13 +93,23 @@ class RealTimeServer:
                         receiver = data.get("receiver")
                         timestamp = data.get("timestamp")
 
-                        # store_message(message)
+                        # TODO Send message to reciever
                         # send_message(message)
+
+                        # Stores messages to the database 
                         if self.DB.get_user(receiver, db_conn, cursor):
-                            self.DB.insert_message(
-                                message, timestamp, user, receiver, db_conn, cursor
-                            )
-                        
+                            receiver_online_status = self.DB.get_user_online_status(receiver, db_conn, cursor)
+                            # If user is online mark as read, otherwise if user is offline mark as unread
+                            if receiver_online_status == True:
+                                self.DB.insert_message(
+                                    message, timestamp, user, receiver, receiver_online_status, db_conn, cursor
+                                )
+                            else:
+                                self.DB.insert_message(
+                                    message, timestamp, user, receiver, receiver_online_status, db_conn, cursor
+                                )
+
+                        # receiver user does not exist, message is not stored to database
                         else:
                             print(f"User {receiver} does not exist")
 
