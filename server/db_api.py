@@ -59,7 +59,9 @@ class DatabaseApi(object):
 
         return user_id[0]
 
-    def insert_message(self, message_body, message_date, sender, receiver, receiver_read, conn, cursor):
+    def insert_message(
+        self, message_body, message_date, sender, receiver, receiver_read, conn, cursor
+    ):
         """Inserts a message into the messages table."""
         cursor.execute(
             """
@@ -82,12 +84,10 @@ class DatabaseApi(object):
         )
         conn.commit()
 
-
-
     def insert_session(self, user, conn, cursor):
-        """ Inserts a session into the session table.
-            If session record exists, user is online.
-            If session record does not exist, user is offline.        
+        """Inserts a session into the session table.
+        If session record exists, user is online.
+        If session record does not exist, user is offline.
         """
         cursor.execute(
             """
@@ -98,10 +98,9 @@ class DatabaseApi(object):
         )
         conn.commit()
 
-
     def delete_session(self, user, conn, cursor):
-        """ Deletes a session from the session table.
-            The user is logging out.    
+        """Deletes a session from the session table.
+        The user is logging out.
         """
         cursor.execute(
             """
@@ -110,7 +109,6 @@ class DatabaseApi(object):
             (user,),
         )
         conn.commit()
-
 
     def get_user_online_status(self, user, conn, cursor):
         """
@@ -131,4 +129,23 @@ class DatabaseApi(object):
             return False
         else:
             return True
-        
+
+    def get_history(self, user, recipient, conn, cursor):
+        """Get all messages between a sender and reciever from the messages table"""
+
+        cursor.execute(
+            """
+            SELECT sender, receiver, message_body, message_date 
+            FROM messages 
+            WHERE (sender = ? AND receiver = ?) OR (sender = ? AND receiver = ?)
+            ORDER BY message_date
+            """,
+            (user, recipient, recipient, user),
+        )
+
+        history = []
+        messages = cursor.fetchall()
+        for message in messages:
+            history.append(message)
+
+        return history

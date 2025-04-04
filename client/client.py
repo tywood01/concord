@@ -58,13 +58,23 @@ class RealTimeClient:
 
         try:
             while True:
-                reciever = input("Enter reciever: ")
+                ack = ""
+
+                while ack != "ACK":
+                    print(ack)
+                    reciever = input("Enter reciever: ")
+                    self.client_socket.sendall(reciever.encode())
+                    ack = self.client_socket.recv(1024).decode()
+
+                history = self.client_socket.recv(1024).decode()
+
+                print(history)
+
                 message = input("Enter message: ")
                 timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
                 data = {
                     "username": self.username,
-                    "receiver": reciever,
                     "message": message,
                     "timestamp": timestamp,
                 }
@@ -94,9 +104,9 @@ class RealTimeClient:
             print("Closing client")
             client_socket.close()
 
-
     def display_messages(self, db_conn, cursor):
         """Retrieve and display all messages from the database."""
+
     try:
         # Assuming there is a 'messages' table in the database
         cursor.execute("SELECT sender, receiver, message_body, timestamp FROM messages")
@@ -106,7 +116,9 @@ class RealTimeClient:
         print("-----------------------------------")
         for message in messages:
             sender, receiver, message_body, timestamp = message
-            print(f"From: {sender} | To: {receiver} | Message: {message_body} | Timestamp: {timestamp}")
+            print(
+                f"From: {sender} | To: {receiver} | Message: {message_body} | Timestamp: {timestamp}"
+            )
     except Exception as e:
         print(f"Error retrieving messages: {e}")
 
