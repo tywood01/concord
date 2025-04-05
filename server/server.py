@@ -21,6 +21,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from settings import HOST, PORT
 
 
+
 class RealTimeServer:
     def __init__(self):
         self.DB = db_api.DatabaseApi()
