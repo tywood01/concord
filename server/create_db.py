@@ -17,11 +17,19 @@ cursor = conn.cursor()
 cursor.execute("""
 CREATE TABLE IF NOT EXISTS users (
     userid INTEGER PRIMARY KEY AUTOINCREMENT,
-    username TEXT NOT NULL UNIQUE,
-    last_login DATETIME,
-    online INTEGER DEFAULT 0
+    username TEXT NOT NULL UNIQUE
 )
 """)
+
+# Create the sessions table
+cursor.execute("""
+CREATE TABLE IF NOT EXISTS sessions (
+    sessionid INTEGER PRIMARY KEY AUTOINCREMENT,
+    user INTEGER NOT NULL,
+    FOREIGN KEY (user) REFERENCES users(userid)
+)
+""")
+
 
 # Create the messages table
 cursor.execute("""
@@ -31,6 +39,7 @@ CREATE TABLE IF NOT EXISTS messages (
     message_date DATETIME,
     sender INTEGER NOT NULL,
     receiver INTEGER NOT NULL,
+    receiver_read BOOLEAN NOT NULL,
     FOREIGN KEY (sender) REFERENCES users(userid),
     FOREIGN KEY (receiver) REFERENCES users(userid)
 )

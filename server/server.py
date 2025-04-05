@@ -9,128 +9,165 @@ Description:
 
 import socket
 import threading
-import sqlite3
 import json
 import os
 import sys
+import db_api
+import datetime
 
 # Add the root directory to the system path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from ..settings import HOST, PORT, DATABASE
+from settings import HOST, PORT
 
 
-def store_user():
-    conn = sqlite3.connect(DATABASE)
-    cursor = conn.cursor()
-    # Updates tables with user ids, username, last login date, and current online status
-    cursor.execute(
-        """
-        INSERT INTO users (username, last_login, online) VALUES
-            ('client5', '2025-03-26 10:05:00', 1),
-            ('client6', '2025-03-26 10:05:00', 1)
-        """
-    )
-    conn.commit()
 
-    # Commit the changes and close the connection
-    # Show all the messages in the messages table
-    cursor.execute("SELECT * FROM users")
-    rows = cursor.fetchall()
-    for row in rows:
-        print(row, flush=True)
+class RealTimeServer:
+    def __init__(self):
+        self.DB = db_api.DatabaseApi()
+        self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.server_socket.bind((HOST, PORT))
+        self.server_socket.listen(1)
 
-    print("Table 'users' has been created successfully in 'database.py'.")
-
-
-def store_message(data):
-    print("inside stor message")
-    conn = sqlite3.connect(DATABASE)
-    cursor = conn.cursor()
-
-    try:
-        # Deserialize JSON string into components
-        username = data.get("username")
-        message_body = data.get("message_body")
-        receiver = data.get("receiver")
-        timestamp = data.get("timestamp")
-
-        print(f"Storing message: {data}", flush=True)
-
-        # Insert message into messages table
-        cursor.execute(
-            """
-            INSERT INTO messages (message_body, message_date, sender, receiver)
-            VALUES (?, ?, ?, ?)
-            """,
-            (message_body, timestamp, username, receiver),
-        )
-
-        conn.commit()
-        print("User tables updated")
-
-        cursor.execute("SELECT * FROM messages;")
-        rows = cursor.fetchall()
-        for row in rows:
-            print(row, flush=True)
-
-    except Exception as e:
-        print(f"Error in store_message: {e}", flush=True)
-
-    finally:
-        print("closing connection")
-        conn.close()
-
-
-def handler(client_conn, addr):
-    """Handles incoming connections and messages from clients"""
-
-    print("Got connection from", addr)
-    with client_conn:
-        user = client_conn.recv(1024).decode()
-        print(f"User {user} connected from {addr}")
+    def main(self):
+        print(f"Server listening on {HOST}:{PORT}")
 
         while True:
-            data = client_conn.recv(1024)
-            if not data:
-                print(f"Client {addr} disconnected")
-                break
+            client_conn, client_addr = self.server_socket.accept()
+            thread = threading.Thread(
+                target=self.handler, args=(client_conn, client_addr)
+            )
+            thread.start()
 
-            try:
-                message = json.loads(data.decode())
-                # Deserialize JSON string into components
-                sender = message.get("username")
-                message_body = message.get("message_body")
-                receiver = message.get("receiver")
-                timestamp = message.get("timestamp")
+    def handler(self, client_conn, addr):
+        """Handles incoming connections and messages from clients"""
 
-                store_message(message)
-                # send_message(message)
+        # Create independant DB connection for each client
+        db_conn, cursor = self.DB.get_connection()
 
-                print(
-                    f"User {sender} from {addr} says: {message_body} to {receiver} at time {timestamp}"
-                )
+        try:
+            print("Got connection from", addr)
+            with client_conn:
+                # Client "Login" process
+                user = None
+                while not user:
+                    user = client_conn.recv(1024).decode()
 
-                # Send acknowledgment back to the client
-                client_conn.sendall(b"Message received")
+                    if self.DB.get_user(user, db_conn, cursor) is None:
+                        client_conn.sendall(
+                            b"User does not exist would you like to create it? (y/n)"
+                        )
+                        response = client_conn.recv(1024).decode()
+                        if response == "y":
+                            self.DB.insert_user(user, db_conn, cursor)
+                        else:
+                            user = None
 
-            except json.JSONDecodeError:
-                print("Received invalid JSON data")
-                client_conn.sendall(b"Received invalid JSON data")
+                client_conn.sendall(b"ACK")
+                print(f"User {user} connected from {addr}")
+
+                # User is online, insert a user session record
+                self.DB.insert_session(user, db_conn, cursor)
+
+                # TODO (We probably don't have to do this, this is harder) Retrieve all recived read messages for user & all sent messages (both sorted by date intertwined)
+
+                # TODO (We should do this) Retrieve all unread messages for user (sorted by date)
+
+                # Marks all unread messages as read for receiver
+                # self.DB.read_messages(user, db_conn, cursor)
+
+                # Message handling loop
+                while True:
+                    recipient = None
+                    while recipient is None:
+                        recipient = client_conn.recv(1024).decode()
+
+                        recipient = self.DB.get_user(recipient, db_conn, cursor)
+
+                        if recipient is None:
+                            client_conn.sendall(
+                                b"User does not exist, please specify a different user"
+                            )
+                            print(f"User {recipient} does not exist")
+
+                    ack = "ACK"
+                    client_conn.sendall(ack.encode())
+
+                    history = self.DB.get_history(user, recipient, db_conn, cursor)
+
+                    print(history)
+                    client_conn.sendall(json.dumps(history).encode())
+
+                    data = client_conn.recv(1024)
+
+                    if not data:
+                        # Client disconnected & remove user session record
+                        self.DB.delete_session(user, db_conn, cursor)
+                        print(f"Client {addr} disconnected")
+                        break
+
+                    try:
+                        data = json.loads(data.decode())
+                        # Deserialize JSON string into components
+                        receiver = data.get("receiver")
+
+                        message = data.get("message")
+                        timestamp = data.get("timestamp")
+
+                        # TODO Send message to reciever
+                        # send_message(message)
+
+                        # Stores messages to the database
+                        if self.DB.get_user(receiver, db_conn, cursor):
+                            receiver_online_status = self.DB.get_user_online_status(
+                                receiver, db_conn, cursor
+                            )
+                            # If user is online mark as read, otherwise if user is offline mark as unread
+                            if receiver_online_status == True:
+                                self.DB.insert_message(
+                                    message,
+                                    timestamp,
+                                    user,
+                                    receiver,
+                                    receiver_online_status,
+                                    db_conn,
+                                    cursor,
+                                )
+                            else:
+                                self.DB.insert_message(
+                                    message,
+                                    timestamp,
+                                    user,
+                                    receiver,
+                                    receiver_online_status,
+                                    db_conn,
+                                    cursor,
+                                )
+
+                        # receiver user does not exist, message is not stored to database
+                        else:
+                            print(f"User {receiver} does not exist")
+
+                        print(
+                            f"User {user} from {addr} says: {message} to {receiver} at time {timestamp}"
+                        )
+
+                        # Send acknowledgment back to the client
+                        client_conn.sendall(b"Message received")
+
+                    except json.JSONDecodeError:
+                        print("Received invalid JSON data")
+                        client_conn.sendall(b"Received invalid JSON data")
+
+        except KeyboardInterrupt:
+            print("Closing server")
+            client_conn.close()
+            db_conn.close()
 
 
 def main():
-    server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    server_socket.bind((HOST, PORT))
-    server_socket.listen(1)
-    print(f"Server listening on {HOST}:{PORT}")
-    store_user()
-
-    while True:
-        client_conn, addr = server_socket.accept()
-        client_conn.send(b"Welcome to Concord!")
-        thread = threading.Thread(target=handler, args=(client_conn, addr))
-        thread.start()
+    server = RealTimeServer()
+    server.main()
 
 
 if __name__ == "__main__":
