@@ -13,7 +13,6 @@ import json
 import os
 import sys
 import db_api
-import datetime
 
 # Add the root directory to the system path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -28,6 +27,19 @@ class RealTimeServer:
         self.server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.server_socket.bind((HOST, PORT))
         self.server_socket.listen(1)
+        self.online_users = {}
+        self.online_users_lock = threading.Lock()
+
+    def add_online(self, user, client_conn):
+        """Locking to prevent race conditions"""
+        with self.online_users_lock:
+            self.online_users[user] = client_conn
+
+    def remove_online(self, user):
+        """Locking to prevent race conditions"""
+        with self.online_users_lock:
+            if user in self.online_users:
+                del self.online_users[user]
 
     def main(self):
         print(f"Server listening on {HOST}:{PORT}")
@@ -39,136 +51,121 @@ class RealTimeServer:
             )
             thread.start()
 
-    def handler(self, client_conn, addr):
-        """Handles incoming connections and messages from clients"""
+    def login(self, client_conn, db_conn, cursor):
+        """Identify or create user"""
 
-        # Create independant DB connection for each client
+        user = None
+        while not user:
+            user = client_conn.recv(1024).decode()
+
+            if self.DB.get_user(user, db_conn, cursor) is None:
+                client_conn.sendall(
+                    b"User does not exist would you like to create it? (y/n)"
+                )
+                response = client_conn.recv(1024).decode()
+                if response == "y":
+                    self.DB.insert_user(user, db_conn, cursor)
+                else:
+                    user = None
+
+        client_conn.sendall(b"ACK")
+
+        return user
+
+    def send_history(self, user, client_conn, db_conn, cursor):
+        """Send chat history to the client."""
+        history = self.DB.get_history(user, db_conn, cursor)
+
+        message_content = {"history": []}
+        for message in history:
+            message_content["history"].append(
+                {"timestamp": message[3], "message": message[2], "sender": message[0]}
+            )
+
+        client_conn.sendall(json.dumps(message_content).encode("utf-8"))
+
+    def handler(self, client_conn, addr):
+        """Handles incoming connections and messages from clients."""
         db_conn, cursor = self.DB.get_connection()
 
         try:
             print("Got connection from", addr)
             with client_conn:
-                # Client "Login" process
-                user = None
-                while not user:
-                    user = client_conn.recv(1024).decode()
+                # User is online, insert a user session record
+                user = self.login(client_conn, db_conn, cursor)
+                self.add_online(user, client_conn)
+                self.DB.insert_session(user, addr[0], addr[1], db_conn, cursor)
 
-                    if self.DB.get_user(user, db_conn, cursor) is None:
-                        client_conn.sendall(
-                            b"User does not exist would you like to create it? (y/n)"
-                        )
-                        response = client_conn.recv(1024).decode()
-                        if response == "y":
-                            self.DB.insert_user(user, db_conn, cursor)
-                        else:
-                            user = None
-
-                client_conn.sendall(b"ACK")
+                # Add user to online users with a lock
+                with self.online_users_lock:
+                    self.online_users[user] = client_conn
                 print(f"User {user} connected from {addr}")
 
-                # User is online, insert a user session record
-                self.DB.insert_session(user, db_conn, cursor)
+                # Send chat history to the client
+                self.send_history(user, client_conn, db_conn, cursor)
 
-                # TODO (We probably don't have to do this, this is harder) Retrieve all recived read messages for user & all sent messages (both sorted by date intertwined)
-
-                # TODO (We should do this) Retrieve all unread messages for user (sorted by date)
-
-                # Marks all unread messages as read for receiver
-                # self.DB.read_messages(user, db_conn, cursor)
-
-                # Message handling loop
+                # Message Handler
                 while True:
-                    recipient = None
-                    while recipient is None:
-                        recipient = client_conn.recv(1024).decode()
-
-                        recipient = self.DB.get_user(recipient, db_conn, cursor)
-
-                        if recipient is None:
-                            client_conn.sendall(
-                                b"User does not exist, please specify a different user"
-                            )
-                            print(f"User {recipient} does not exist")
-
-                    ack = "ACK"
-                    client_conn.sendall(ack.encode())
-
-                    history = self.DB.get_history(user, recipient, db_conn, cursor)
-
-                    print(history)
-                    client_conn.sendall(json.dumps(history).encode())
-
                     data = client_conn.recv(1024)
 
-                    if not data:
-                        # Client disconnected & remove user session record
-                        self.DB.delete_session(user, db_conn, cursor)
-                        print(f"Client {addr} disconnected")
-                        break
-
                     try:
-                        data = json.loads(data.decode())
                         # Deserialize JSON string into components
-                        receiver = data.get("receiver")
-
+                        data = json.loads(data.decode())
                         message = data.get("message")
                         timestamp = data.get("timestamp")
+                        recipient = data.get("recipient")
 
-                        # TODO Send message to reciever
-                        # send_message(message)
+                        print(f"Recipient: {recipient}")
+                        recipient_id = self.DB.get_user(recipient, db_conn, cursor)
+                        print(f"Recipient ID: {recipient_id}")
 
-                        # Stores messages to the database
-                        if self.DB.get_user(receiver, db_conn, cursor):
-                            receiver_online_status = self.DB.get_user_online_status(
-                                receiver, db_conn, cursor
+                        if recipient_id:
+                            # Check if recipient is online
+                            with self.online_users_lock:
+                                recipient_conn = self.online_users.get(recipient)
+                            if recipient_conn:
+                                forward_message = {
+                                    "sender": user,
+                                    "message": message,
+                                    "timestamp": timestamp,
+                                }
+                                recipient_conn.sendall(
+                                    json.dumps(forward_message).encode("utf-8")
+                                )
+                                print(f"Message forwarded to {recipient}")
+
+                            self.DB.insert_message(
+                                message,
+                                timestamp,
+                                user,
+                                recipient,
+                                bool(recipient_id),
+                                db_conn,
+                                cursor,
                             )
-                            # If user is online mark as read, otherwise if user is offline mark as unread
-                            if receiver_online_status == True:
-                                self.DB.insert_message(
-                                    message,
-                                    timestamp,
-                                    user,
-                                    receiver,
-                                    receiver_online_status,
-                                    db_conn,
-                                    cursor,
-                                )
-                            else:
-                                self.DB.insert_message(
-                                    message,
-                                    timestamp,
-                                    user,
-                                    receiver,
-                                    receiver_online_status,
-                                    db_conn,
-                                    cursor,
-                                )
+                            print("Message stored")
 
-                        # receiver user does not exist, message is not stored to database
+                            client_conn.sendall(b"Message sent")
                         else:
-                            print(f"User {receiver} does not exist")
-
-                        print(
-                            f"User {user} from {addr} says: {message} to {receiver} at time {timestamp}"
-                        )
-
-                        # Send acknowledgment back to the client
-                        client_conn.sendall(b"Message received")
+                            print("Invalid recipient")
+                            client_conn.sendall(b"Invalid recipient")
 
                     except json.JSONDecodeError:
-                        print("Received invalid JSON data")
-                        client_conn.sendall(b"Received invalid JSON data")
+                        # Since TCP is stream oriented it might trip this a lot...
+                        print("Received invalid JSON data or data too long")
+                        # client_conn.sendall(b"Invalid JSON data")
 
-        except KeyboardInterrupt:
-            print("Closing server")
-            client_conn.close()
-            db_conn.close()
-
-
-def main():
-    server = RealTimeServer()
-    server.main()
+        except (BrokenPipeError, ConnectionResetError):
+            print(f"User {user} disconnected")
+        finally:
+            # Clean up on disconnection
+            with self.online_users_lock:
+                if user in self.online_users:
+                    del self.online_users[user]
+            self.DB.delete_session(user, db_conn, cursor)
+            self.remove_online(user)
 
 
 if __name__ == "__main__":
-    main()
+    server = RealTimeServer()
+    server.main()
