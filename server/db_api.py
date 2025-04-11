@@ -84,17 +84,17 @@ class DatabaseApi(object):
         )
         conn.commit()
 
-    def insert_session(self, user, conn, cursor):
+    def insert_session(self, user, addr, port, conn, cursor):
         """Inserts a session into the session table.
         If session record exists, user is online.
         If session record does not exist, user is offline.
         """
         cursor.execute(
             """
-            INSERT INTO sessions (user)
-            VALUES (?)
+            INSERT INTO sessions (user, port, address)
+            VALUES (?, ?, ?)
             """,
-            (user,),
+            (user, port, addr),
         )
         conn.commit()
 
@@ -110,42 +110,47 @@ class DatabaseApi(object):
         )
         conn.commit()
 
-    def get_user_online_status(self, user, conn, cursor):
+    def get_session(self, user, conn, cursor):
         """
         Gets the session from the sessions table.
-        If there is no session record, then returns False. (user is not online)
-        If there is a session record, then returns True. (user is online)
+        If there is no session record, then returns None. (user is not online)
+        If there is a session record, then returns the session details. (user is online)
         """
 
         cursor.execute(
             """
-            SELECT user FROM sessions WHERE user = ?
+            SELECT * FROM sessions WHERE user = ?
             """,
             (user,),
         )
-        user_id = cursor.fetchone()
+        session = cursor.fetchone()
 
-        if user_id is None:
-            return False
-        else:
-            return True
+        return session
 
-    def get_history(self, user, recipient, conn, cursor):
-        """Get all messages between a sender and reciever from the messages table"""
+    def get_history(self, user, conn, cursor):
+        """Get all unread messages for a user from the messages table and mark them as read"""
 
         cursor.execute(
             """
             SELECT sender, receiver, message_body, message_date 
             FROM messages 
-            WHERE (sender = ? AND receiver = ?) OR (sender = ? AND receiver = ?)
+            WHERE receiver = ?
             ORDER BY message_date
             """,
-            (user, recipient, recipient, user),
+            (user,),
         )
 
-        history = []
         messages = cursor.fetchall()
-        for message in messages:
-            history.append(message)
 
-        return history
+        # Mark all fetched messages as read
+        cursor.execute(
+            """
+            UPDATE messages
+            SET receiver_read = 1
+            WHERE receiver = ? AND receiver_read = 0
+            """,
+            (user,),
+        )
+        conn.commit()
+
+        return messages
